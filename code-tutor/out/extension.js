@@ -33,6 +33,13 @@ const BASE_PROMPT = `You are a helpful code tutor.
   Respond with a guided overview of the concept in a series of messages. 
   Do not give the user the answer directly, but guide them to find the answer themselves. 
   If the user asks a non-programming question, politely decline to respond.`;
+const EXERCISES_PROMPT = `You are a helpful tutor. Your job is to teach the user with fun, 
+  simple exercises that they can complete in the editor. 
+  Your exercises should start simple and get more complex as the user progresses. 
+  Move one concept at a time, and do not move on to the next concept until the user 
+  provides the correct answer. Give hints in your exercises to help the user learn. 
+  If the user is stuck, you can provide the answer and explain why it is the answer. 
+  If the user asks a non-programming question, politely decline to respond.`;
 const MODEL_SELECTOR = {
     vendor: 'copilot',
     family: 'gpt-4o'
@@ -42,13 +49,19 @@ let conversationHistory = [];
 // define a chat handler
 const handler = async (request, context, stream, token) => {
     try {
-        // Initialize or reset history if this is a new conversation
-        if (!context.history?.length) {
-            conversationHistory = [vscode.LanguageModelChatMessage.User(BASE_PROMPT)];
+        // initialize the prompt and model
+        let prompt = BASE_PROMPT;
+        if (request.command === 'exercise') {
+            prompt = EXERCISES_PROMPT;
         }
+        // Select a model for the conversation
         const [model] = await vscode.lm.selectChatModels(MODEL_SELECTOR);
         if (!model) {
             throw new Error('No suitable model found');
+        }
+        // Initialize or reset history if this is a new conversation
+        if (!context.history?.length) {
+            conversationHistory = [vscode.LanguageModelChatMessage.User(prompt)];
         }
         // Add user's new message to history
         const userMessage = vscode.LanguageModelChatMessage.User(request.prompt);

@@ -72,6 +72,10 @@ const handler: vscode.ChatRequestHandler = async (
   token: vscode.CancellationToken
 ) => {
     try {
+      if (request.prompt === '') {
+        stream.markdown('Please provide a prompt');
+        return;
+      }
       // initialize the prompt and model
       let prompt = BASE_PROMPT;
 
@@ -91,10 +95,11 @@ const handler: vscode.ChatRequestHandler = async (
       if (!context.history?.length) {
         conversationHistory = [vscode.LanguageModelChatMessage.User(prompt)];
       }
-      console.log('The conversation history is:', conversationHistory.toString());
+      // console.log('The conversation history is:', conversationHistory.toString());
 
       // Add user's new message to history
       const userMessage = vscode.LanguageModelChatMessage.User(request.prompt);
+      console.log('The user message is:', request.prompt);
       conversationHistory.push(userMessage);
       console.log('Pushed user message to conversation history:');
 

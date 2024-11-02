@@ -44,6 +44,37 @@ const MODEL_SELECTOR = {
     vendor: 'copilot',
     family: 'gpt-4o'
 };
+const MAX_TOKENS = 8000; // Maximum tokens for the model
+const TOKEN_SIZE = 4; // Each token is approximately 4 characters
+function calculateTokens(text) {
+    return Math.ceil(text.length / TOKEN_SIZE);
+}
+function isTextPart(part) {
+    return 'text' in part && typeof part.text === 'string';
+}
+function calculateTokensFromParts(parts) {
+    let totalLength = 0;
+    for (const part of parts) {
+        if (isTextPart(part)) {
+            totalLength += part.value.length;
+        }
+    }
+    return Math.ceil(totalLength / TOKEN_SIZE);
+}
+function trimHistoryIfNeeded(history, newMessage, prompt) {
+    let totalTokens = calculateTokens(prompt) + calculateTokens(newMessage);
+    const trimmedHistory = [];
+    for (let i = history.length - 1; i >= 0; i--) {
+        const message = history[i];
+        const messageTokens = calculateTokensFromParts(message.content);
+        if (totalTokens + messageTokens > MAX_TOKENS) {
+            break;
+        }
+        totalTokens += messageTokens;
+        trimmedHistory.unshift(message);
+    }
+    return trimmedHistory;
+}
 // Store conversation history at module level
 let conversationHistory = [];
 // define a chat handler
@@ -54,27 +85,38 @@ const handler = async (request, context, stream, token) => {
         if (request.command === 'exercise') {
             prompt = EXERCISES_PROMPT;
         }
+        console.log('The prompt is:', prompt);
         // Select a model for the conversation
         const [model] = await vscode.lm.selectChatModels(MODEL_SELECTOR);
         if (!model) {
             throw new Error('No suitable model found');
         }
+        console.log('The model is:', model);
         // Initialize or reset history if this is a new conversation
         if (!context.history?.length) {
             conversationHistory = [vscode.LanguageModelChatMessage.User(prompt)];
         }
+        console.log('The conversation history is:', conversationHistory.toString());
         // Add user's new message to history
         const userMessage = vscode.LanguageModelChatMessage.User(request.prompt);
         conversationHistory.push(userMessage);
+        console.log('Pushed user message to conversation history:');
+        // Trim history if needed
+        conversationHistory = trimHistoryIfNeeded(conversationHistory, request.prompt, prompt);
+        console.log('Trimmed history');
         // Send request with full conversation history
+        console.log('The length of the conversation history is:', conversationHistory.toString().length);
         const chatResponse = await model.sendRequest(conversationHistory, {}, token);
+        console.log('History sent to model:', conversationHistory.toString());
         // Add assistant's response to history and stream it
         let assistantResponse = '';
         for await (const fragment of chatResponse.text) {
             assistantResponse += fragment;
             stream.markdown(fragment);
         }
+        console.log('About to send the assistant response:', assistantResponse);
         conversationHistory.push(vscode.LanguageModelChatMessage.Assistant(assistantResponse));
+        console.log('History after assistant response:', conversationHistory.toString());
     }
     catch (error) {
         stream.markdown(`Chat error: ${error instanceof Error ? error.message : 'Unknown error'}`);

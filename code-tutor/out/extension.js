@@ -25,56 +25,9 @@ var __importStar = (this && this.__importStar) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.activate = activate;
 exports.deactivate = deactivate;
-// The module 'vscode' contains the VS Code extensibility API
-// Import the module and reference it with the alias vscode in your code below
 const vscode = __importStar(require("vscode"));
-const BASE_PROMPT = `You are a helpful code tutor. 
-  Your job is to teach the user with simple descriptions and sample code of the concept.
-  Respond with a guided overview of the concept in a series of messages. 
-  Do not give the user the answer directly, but guide them to find the answer themselves. 
-  If the user asks a non-programming question, politely decline to respond.`;
-const EXERCISES_PROMPT = `You are a helpful tutor. Your job is to teach the user with fun, 
-  simple exercises that they can complete in the editor. 
-  Your exercises should start simple and get more complex as the user progresses. 
-  Move one concept at a time, and do not move on to the next concept until the user 
-  provides the correct answer. Give hints in your exercises to help the user learn. 
-  If the user is stuck, you can provide the answer and explain why it is the answer. 
-  If the user asks a non-programming question, politely decline to respond.`;
-const MODEL_SELECTOR = {
-    vendor: 'copilot',
-    family: 'gpt-4o'
-};
-const MAX_TOKENS = 8000; // Maximum tokens for the model
-const TOKEN_SIZE = 4; // Each token is approximately 4 characters
-function calculateTokens(text) {
-    return Math.ceil(text.length / TOKEN_SIZE);
-}
-function isTextPart(part) {
-    return 'text' in part && typeof part.text === 'string';
-}
-function calculateTokensFromParts(parts) {
-    let totalLength = 0;
-    for (const part of parts) {
-        if (isTextPart(part)) {
-            totalLength += part.value.length;
-        }
-    }
-    return Math.ceil(totalLength / TOKEN_SIZE);
-}
-function trimHistoryIfNeeded(history, newMessage, prompt) {
-    let totalTokens = calculateTokens(prompt) + calculateTokens(newMessage);
-    const trimmedHistory = [];
-    for (let i = history.length - 1; i >= 0; i--) {
-        const message = history[i];
-        const messageTokens = calculateTokensFromParts(message.content);
-        if (totalTokens + messageTokens > MAX_TOKENS) {
-            break;
-        }
-        totalTokens += messageTokens;
-        trimmedHistory.unshift(message);
-    }
-    return trimmedHistory;
-}
+const constants_1 = require("./constants");
+const utils_1 = require("./utils");
 // Store conversation history at module level
 let conversationHistory = [];
 // define a chat handler
@@ -85,12 +38,12 @@ const handler = async (request, context, stream, token) => {
             return;
         }
         // initialize the prompt and model
-        let prompt = BASE_PROMPT;
+        let prompt = constants_1.BASE_PROMPT;
         if (request.command === 'exercise') {
-            prompt = EXERCISES_PROMPT;
+            prompt = constants_1.EXERCISES_PROMPT;
         }
         // Use default model or let user select one
-        const selectedModel = request.model || (await vscode.lm.selectChatModels(MODEL_SELECTOR))[0];
+        const selectedModel = request.model || (await vscode.lm.selectChatModels(constants_1.MODEL_SELECTOR))[0];
         if (!selectedModel) {
             throw new Error('No suitable model found');
         }
@@ -102,7 +55,7 @@ const handler = async (request, context, stream, token) => {
         const userMessage = vscode.LanguageModelChatMessage.User(request.prompt);
         conversationHistory.push(userMessage);
         // Trim history if needed
-        conversationHistory = trimHistoryIfNeeded(conversationHistory, request.prompt, prompt);
+        conversationHistory = (0, utils_1.trimHistoryIfNeeded)(conversationHistory, request.prompt, prompt);
         // Send request with full conversation history
         const chatResponse = await selectedModel.sendRequest(conversationHistory, {}, token);
         // Add assistant's response to history and stream it
@@ -118,7 +71,6 @@ const handler = async (request, context, stream, token) => {
     }
 };
 // This method is called when your extension is activated
-// Your extension is activated the very first time the command is executed
 function activate(context) {
     // create participant
     const tutor = vscode.chat.createChatParticipant('chat-tutorial.code-tutor', handler);

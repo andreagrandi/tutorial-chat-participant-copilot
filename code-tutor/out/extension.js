@@ -89,9 +89,9 @@ const handler = async (request, context, stream, token) => {
         if (request.command === 'exercise') {
             prompt = EXERCISES_PROMPT;
         }
-        // Select a model for the conversation
-        const [model] = await vscode.lm.selectChatModels(MODEL_SELECTOR);
-        if (!model) {
+        // Use default model or let user select one
+        const selectedModel = request.model || (await vscode.lm.selectChatModels(MODEL_SELECTOR))[0];
+        if (!selectedModel) {
             throw new Error('No suitable model found');
         }
         // Initialize or reset history if this is a new conversation
@@ -104,7 +104,7 @@ const handler = async (request, context, stream, token) => {
         // Trim history if needed
         conversationHistory = trimHistoryIfNeeded(conversationHistory, request.prompt, prompt);
         // Send request with full conversation history
-        const chatResponse = await model.sendRequest(conversationHistory, {}, token);
+        const chatResponse = await selectedModel.sendRequest(conversationHistory, {}, token);
         // Add assistant's response to history and stream it
         let assistantResponse = '';
         for await (const fragment of chatResponse.text) {

@@ -83,9 +83,9 @@ const handler: vscode.ChatRequestHandler = async (
         prompt = EXERCISES_PROMPT;
       }
       
-      // Select a model for the conversation
-      const [model] = await vscode.lm.selectChatModels(MODEL_SELECTOR);
-      if (!model) {
+      // Use default model or let user select one
+      const selectedModel = request.model || (await vscode.lm.selectChatModels(MODEL_SELECTOR))[0];
+      if (!selectedModel) {
         throw new Error('No suitable model found');
       }
 
@@ -102,7 +102,7 @@ const handler: vscode.ChatRequestHandler = async (
       conversationHistory = trimHistoryIfNeeded(conversationHistory, request.prompt, prompt);
 
       // Send request with full conversation history
-      const chatResponse = await model.sendRequest(conversationHistory, {}, token);
+      const chatResponse = await selectedModel.sendRequest(conversationHistory, {}, token);
 
       // Add assistant's response to history and stream it
       let assistantResponse = '';
